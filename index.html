@@ -493,7 +493,7 @@ const SPEEDS=[
 const speedEl=document.getElementById('speed'),speedv=document.getElementById('speedv');
 function applySpeed(i){ state.speed=SPEEDS[i].v; speedv.textContent=SPEEDS[i].n; }
 speedEl.oninput=()=>applySpeed(+speedEl.value);
-applySpeed(+speedEl.value);
+speedEl.value=2; applySpeed(2);            // default: Cruising manatee
 document.getElementById('pause').onclick=e=>{state.paused=!state.paused;e.target.textContent=state.paused?'Play':'Pause';};
 document.getElementById('reseed').onclick=()=>{
   sprites.forEach(s=>{ if(s.active) randomPos(s); });
@@ -653,8 +653,9 @@ function closeSub(){ sub.classList.remove('on'); sub.setAttribute('aria-hidden',
 document.getElementById('sub-close').onclick=closeSub;
 sub.addEventListener('click',e=>{ if(e.target===sub) closeSub(); });
 
-/* ---- pointer: hover · drag · double-click ------------------------------ */
+/* ---- pointer: hover · drag · tap-to-focus · double-click --------------- */
 let dragDX=0,dragDY=0,lastX=0,lastY=0,lastT=0,dvx=0,dvy=0;
+let downX=0,downY=0,moved=false,downType='mouse';
 canvas.addEventListener('pointerdown',e=>{
   mx=e.clientX; my=e.clientY;
   const hit=hitTest(mx,my);
@@ -662,6 +663,7 @@ canvas.addEventListener('pointerdown',e=>{
     state.drag=hit; state.focus=null;
     dragDX=mx-hit.x; dragDY=my-hit.y;
     lastX=mx; lastY=my; lastT=performance.now(); dvx=0; dvy=0;
+    downX=mx; downY=my; moved=false; downType=e.pointerType||'mouse';
     try{canvas.setPointerCapture(e.pointerId);}catch(_){}
     canvas.style.cursor='grabbing';
   }
@@ -670,6 +672,7 @@ canvas.addEventListener('pointermove',e=>{
   mx=e.clientX; my=e.clientY;
   if(state.drag){
     state.drag.x=mx-dragDX; state.drag.y=my-dragDY;
+    if(!moved && Math.hypot(mx-downX,my-downY)>8) moved=true;
     const now=performance.now(), dt=Math.max(8,now-lastT)/1000;
     dvx=(mx-lastX)/dt; dvy=(my-lastY)/dt; lastX=mx; lastY=my; lastT=now;
   }else{
@@ -685,7 +688,12 @@ function endDrag(){
   state.drag=null; canvas.style.cursor=hovered?'grab':'default';
 }
 canvas.addEventListener('pointerup',e=>{
-  if(state.drag){ endDrag(); }
+  if(state.drag){
+    const touch=(downType==='touch'||downType==='pen');
+    if(!moved && touch){                       // tap on a plan → open focus (mobile)
+      const hit=state.drag; state.drag=null; canvas.style.cursor='default'; openSub(hit);
+    } else { endDrag(); }
+  }
   else if(!hitTest(e.clientX,e.clientY)){ state.focus=null; findInput.value=''; }
 });
 canvas.addEventListener('pointercancel',endDrag);
@@ -773,6 +781,12 @@ function draw(){
     ctx.save();
     ctx.translate(s.x,s.y); ctx.rotate(s.ang);
     ctx.globalAlpha=(held(s)||s===hovered)?1:opacityFor(s.d);
+    const L=Math.max(w,h);
+    if(L<110){               // small on screen: thicken thin strokes so they stay visible (true scale kept)
+      const o=Math.min(1.4,Math.max(0.5,(110-L)/90));
+      ctx.drawImage(s.bitmap,-w/2-o,-h/2,w,h); ctx.drawImage(s.bitmap,-w/2+o,-h/2,w,h);
+      ctx.drawImage(s.bitmap,-w/2,-h/2-o,w,h); ctx.drawImage(s.bitmap,-w/2,-h/2+o,w,h);
+    }
     ctx.drawImage(s.bitmap,-w/2,-h/2,w,h);
     ctx.restore();
   }
