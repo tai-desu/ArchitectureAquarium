@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Architecture Playground — Floorplan Aquarium</title>
+<style>
+  :root{
+    --ink:#ffffff;--bg:#000000;
+    --hair:rgba(255,255,255,.28);--hair-soft:rgba(255,255,255,.14);
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --grotesk:"Helvetica Neue",Arial,system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);overflow:hidden}
+  canvas#c{display:block;position:fixed;inset:0;width:100vw;height:100vh;touch-action:none}
+
+  .masthead{position:fixed;top:max(18px,env(safe-area-inset-top));left:22px;z-index:10;
+    pointer-events:none;mix-blend-mode:difference}
+  .wordmark{font-family:var(--grotesk);font-weight:800;letter-spacing:-.035em;
+    font-size:clamp(21.6px,3.6vw,45px);line-height:.9}
+  .submark{font-family:var(--mono);font-size:11px;letter-spacing:.34em;
+    margin-top:8px;opacity:.75;text-transform:uppercase}
+
+  .panel{position:fixed;right:18px;top:max(18px,env(safe-area-inset-top));z-index:10;
+    width:208px;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);
+    border:1px solid var(--hair);font-family:var(--mono);font-size:11px;
+    text-transform:uppercase;letter-spacing:.12em}
+  .phead{display:flex;justify-content:space-between;align-items:center;
+    padding:8px 11px;border-bottom:1px solid var(--hair);
+    font-size:10px;letter-spacing:.22em;opacity:.85;user-select:none}
+  .phead button{font:inherit;color:var(--ink);background:transparent;border:1px solid var(--hair);
+    width:20px;height:20px;line-height:1;cursor:pointer}
+  .phead button:hover{background:rgba(255,255,255,.08)}
+  .panel.collapsed .pbody{display:none}
+  .row{padding:7px 11px;border-bottom:1px solid var(--hair-soft)}
+  .row:last-child{border-bottom:0}
+  .lbl{display:flex;justify-content:space-between;align-items:center;
+    opacity:.7;margin-bottom:6px;font-size:10px;letter-spacing:.2em}
+  .lbl b{font-weight:400;opacity:1;color:var(--ink)}
+  .lbl #speedv{text-transform:none;letter-spacing:.02em}
+  .seg{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+  .seg2{grid-template-columns:1fr 1fr}
+  .modes{display:flex;flex-direction:column;gap:5px}
+  .modes button{display:flex;justify-content:space-between;align-items:center;font:inherit;
+    text-transform:uppercase;letter-spacing:.1em;padding:7px 9px;background:transparent;
+    color:var(--ink);border:1px solid var(--hair);cursor:pointer;transition:.15s}
+  .modes button span{opacity:.5;font-size:9px;letter-spacing:.05em}
+  .modes button[aria-pressed="true"]{background:var(--ink);color:#000;border-color:var(--ink)}
+  .modes button:hover{background:rgba(255,255,255,.08)}
+  .modes button[aria-pressed="true"]:hover{background:#eee}
+  .seg button{font:inherit;text-transform:uppercase;letter-spacing:.1em;padding:6px 0;
+    background:transparent;color:var(--ink);border:1px solid var(--hair);cursor:pointer;transition:.15s}
+  .seg button[aria-pressed="true"]{background:var(--ink);color:#000;border-color:var(--ink)}
+  .seg button .n{display:block;font-size:8px;opacity:.55;margin-top:2px;letter-spacing:.05em}
+  input[type=range]{width:100%;accent-color:#fff;background:transparent;margin:0}
+  .legend{display:flex;flex-direction:column;gap:6px;font-size:10px;letter-spacing:.14em}
+  .legend div{display:flex;align-items:center;gap:9px;opacity:.85}
+  .dot{width:22px;height:1px;background:#fff}
+  .legend div:nth-child(2) .dot{opacity:.75}
+  .legend div:nth-child(3) .dot{opacity:.25}
+  .find input{width:100%;background:transparent;border:1px solid var(--hair);color:#fff;
+    font:inherit;text-transform:none;letter-spacing:normal;padding:6px 8px;margin-bottom:5px;outline:none}
+  .find input::placeholder{color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.1em;font-size:10px}
+  .find input:focus{border-color:#fff}
+  .find input.miss{border-color:#fff;animation:flash .5s}
+  @keyframes flash{0%,100%{border-color:#fff}25%,75%{border-color:rgba(255,255,255,.15)}}
+  .find button{width:100%;font:inherit;text-transform:uppercase;letter-spacing:.12em;padding:6px 0;
+    background:transparent;color:#fff;border:1px solid var(--hair);cursor:pointer}
+  .find button:hover{background:rgba(255,255,255,.08)}
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+  .btns button{font:inherit;text-transform:uppercase;letter-spacing:.12em;padding:6px 0;
+    background:transparent;color:var(--ink);border:1px solid var(--hair);cursor:pointer}
+  .btns button:hover{background:rgba(255,255,255,.08)}
+  .toggle{width:100%;font:inherit;text-transform:uppercase;letter-spacing:.12em;padding:6px 0;
+    background:transparent;color:#fff;border:1px solid var(--hair);cursor:pointer;transition:.15s}
+  .toggle[aria-pressed="true"]{background:var(--ink);color:#000;border-color:var(--ink)}
+  .toggle:hover{background:rgba(255,255,255,.08)}
+  .toggle[aria-pressed="true"]:hover{background:#eee}
+
+  /* ---- hover info card ---- */
+  .card{position:fixed;z-index:20;min-width:218px;max-width:280px;
+    background:rgba(0,0,0,.82);backdrop-filter:blur(8px);border:1px solid var(--hair);
+    font-family:var(--mono);padding:14px 15px 13px;opacity:0;transform:translateY(4px);
+    transition:opacity .12s,transform .12s;pointer-events:none}
+  .card.on{opacity:1;transform:none}
+  .card h3{font-family:var(--grotesk);font-weight:700;font-size:16px;letter-spacing:-.01em;
+    margin:0 0 10px;line-height:1.1}
+  .card dl{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;margin:0;font-size:11px}
+  .card dt{opacity:.5;text-transform:uppercase;letter-spacing:.16em;font-size:9px;align-self:center}
+  .card dd{margin:0;text-align:right;letter-spacing:.02em}
+  .card .more{margin-top:10px;font-size:9px;letter-spacing:.18em;text-transform:uppercase;opacity:.5}
+
+  /* ---- focus subpage ---- */
+  .subpage{position:fixed;inset:0;z-index:40;background:#000;
+    display:none;align-items:center;justify-content:center;padding:40px}
+  .subpage.on{display:flex}
+  .sub-inner{display:flex;gap:52px;align-items:center;max-width:1200px;width:100%;justify-content:center}
+  #subcanvas{display:block;max-width:60vw;max-height:74vh}
+  .sub-meta{font-family:var(--mono);max-width:300px}
+  .sub-meta .eyebrow{font-size:10px;letter-spacing:.3em;text-transform:uppercase;opacity:.45;margin-bottom:12px}
+  .sub-meta h2{font-family:var(--grotesk);font-weight:800;font-size:clamp(22px,3vw,34px);
+    letter-spacing:-.02em;margin:0 0 20px;line-height:1.05}
+  .sub-meta dl{display:grid;grid-template-columns:auto 1fr;gap:10px 18px;margin:0;font-size:12px}
+  .sub-meta dt{opacity:.5;text-transform:uppercase;letter-spacing:.18em;font-size:10px;align-self:center}
+  .sub-meta dd{margin:0;text-align:right}
+  .sub-meta a{display:inline-block;margin-top:24px;font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+    color:#fff;text-decoration:none;border-bottom:1px solid var(--hair);padding-bottom:2px}
+  .sub-meta a:hover{border-color:#fff}
+  #sub-close{position:fixed;top:22px;right:22px;z-index:41;font-family:var(--mono);font-size:11px;
+    letter-spacing:.18em;text-transform:uppercase;color:#fff;background:transparent;
+    border:1px solid var(--hair);padding:9px 14px;cursor:pointer}
+  #sub-close:hover{background:rgba(255,255,255,.08)}
+  @media(max-width:760px){
+    .sub-inner{flex-direction:column;gap:26px}
+    #subcanvas{max-width:86vw;max-height:48vh}
+  }
+
+  .hint{position:fixed;left:22px;bottom:16px;z-index:10;font-family:var(--mono);font-size:10px;
+    letter-spacing:.18em;opacity:.4;text-transform:uppercase;mix-blend-mode:difference;pointer-events:none}
+  .owner{position:fixed;right:20px;bottom:15px;z-index:10;font-family:var(--mono);font-size:10px;
+    letter-spacing:.24em;text-transform:uppercase;opacity:.55;mix-blend-mode:difference;pointer-events:none}
+  .scalebar{position:fixed;right:20px;bottom:38px;z-index:10;font-family:var(--mono);
+    text-align:right;mix-blend-mode:difference;pointer-events:none}
+  .sb-label{font-size:10px;letter-spacing:.22em;text-transform:uppercase;opacity:.75;margin-bottom:5px}
+  .sb-bar{display:inline-block;height:7px;border:1px solid #fff;border-top:none;opacity:.85}
+  @media (max-width:560px){
+    .panel{left:18px;right:18px;width:auto;top:auto;bottom:14px}
+    .hint{display:none}
+    .owner{bottom:auto;top:max(18px,env(safe-area-inset-top));right:20px}
+    .scalebar{bottom:auto;top:calc(max(18px,env(safe-area-inset-top)) + 26px);right:20px}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="masthead">
+  <div class="wordmark">Architecture<br>Playground</div>
+  <div class="submark">Floorplan Aquarium</div>
+</div>
+
+<aside class="panel collapsed" id="panel">
+  <div class="phead"><span>Controls</span><button id="collapse" aria-label="Collapse panel">+</button></div>
+  <div class="pbody" id="pbody">
+    <div class="row find">
+      <div class="lbl">Call out</div>
+      <input id="find" type="text" placeholder="Building name…" autocomplete="off" spellcheck="false">
+      <button id="findbtn">Call out</button>
+    </div>
+    <div class="row">
+      <div class="lbl">Mode <b id="modev">Sunny bath</b></div>
+      <div class="modes" id="modes">
+        <button data-mode="frenzy">Feeding frenzy <span>all</span></button>
+        <button data-mode="sunny" aria-pressed="true">Sunny bath <span>20</span></button>
+        <button data-mode="quiet">Quiet night <span>10</span></button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="lbl">Size class <b id="count">—</b></div>
+      <div class="seg" id="sizes">
+        <button data-cat="S" aria-pressed="true">S<span class="n">house</span></button>
+        <button data-cat="M" aria-pressed="true">M<span class="n">mid</span></button>
+        <button data-cat="L" aria-pressed="true">L<span class="n">large</span></button>
+        <button data-cat="XL" aria-pressed="false">XL<span class="n">mega</span></button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="lbl">Scale <b id="scalev">Fit</b></div>
+      <input type="range" id="scale" min="0" max="3" step="1" value="0">
+    </div>
+    <div class="row">
+      <div class="lbl">Drift <b id="speedv">Drifting jellyfish</b></div>
+      <input type="range" id="speed" min="0" max="4" step="1" value="1">
+    </div>
+    <div class="row">
+      <div class="lbl">Scale grid <b id="gridv">5×5 m</b></div>
+      <button id="gridtoggle" class="toggle" aria-pressed="true">Grid</button>
+    </div>
+    <div class="row">
+      <div class="lbl">Sound <b id="soundv">on</b></div>
+      <button id="soundtoggle" class="toggle" aria-pressed="true">Sound</button>
+    </div>
+    <div class="row">
+      <div class="btns">
+        <button id="pause">Pause</button>
+        <button id="reseed">Reseed</button>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<div class="card" id="card" aria-hidden="true"></div>
+
+<div class="subpage" id="sub" aria-hidden="true">
+  <div class="sub-inner">
+    <canvas id="subcanvas"></canvas>
+    <div class="sub-meta">
+      <div class="eyebrow">Floor plan · original orientation</div>
+      <h2 id="sub-name"></h2>
+      <dl id="sub-dl"></dl>
+      <a id="sub-link" target="_blank" rel="noopener">Read more →</a>
+    </div>
+  </div>
+  <button id="sub-close">Close ✕</button>
+</div>
+
+<div class="hint">Hover · drag to move · double-click to focus</div>
+<div class="scalebar" id="scalebar">
+  <div class="sb-label" id="sb-label">10 m</div>
+  <div class="sb-bar" id="sb-bar" style="width:80px"></div>
+</div>
+<div class="owner">siteowner : Exthai</div>
+
+<script>
+/* =========================================================================
+   ARCHITECTURE PLAYGROUND — FLOORPLAN AQUARIUM
+   Edit PLANS to add your collection. Per building:
+     name, src(white-line PNG, optional), meters[W,H] (drives scale),
+     function, architect, year, url, area(optional gross m²).
+   ========================================================================= */
+
+const PX_PER_M = 1.25;
+const CAT = { S:[0,300], M:[300,4000], L:[4000,40000], XL:[40000,Infinity] };
+
+const DEMO_PLANS = [
+  {name:"Townhouse",    meters:[9,14],    function:"Residence",      architect:"—", year:2012, url:"#"},
+  {name:"Pavilion",     meters:[12,12],   function:"Garden pavilion",architect:"—", year:2008, url:"#"},
+  {name:"Courtyard H",  meters:[16,18],   function:"Residence",      architect:"—", year:2016, url:"#"},
+  {name:"Studio",       meters:[7,11],    function:"Artist studio",  architect:"—", year:2019, url:"#"},
+  {name:"Library",      meters:[42,58],   function:"Public library", architect:"—", year:2004, url:"#"},
+  {name:"School Wing",  meters:[68,34],   function:"Education",      architect:"—", year:2011, url:"#"},
+  {name:"Art Museum",   meters:[55,75],   function:"Museum",         architect:"—", year:2009, url:"#"},
+  {name:"Office Slab",  meters:[90,24],   function:"Workplace",      architect:"—", year:2015, url:"#"},
+  {name:"Concert Hall", meters:[120,95],  function:"Performance",    architect:"—", year:2007, url:"#"},
+  {name:"Terminal A",   meters:[160,130], function:"Transport",      architect:"—", year:2018, url:"#"},
+  {name:"Stadium",      meters:[230,200], function:"Sports",         architect:"—", year:2002, url:"#"},
+  {name:"Airfield Hub", meters:[300,260], function:"Transport",      architect:"—", year:2021, url:"#"},
+];
+let PLANS = DEMO_PLANS;     // replaced by plans.csv at startup if that file exists
+
+const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+let DPR=Math.min(window.devicePixelRatio||1,2), W=0,H=0;
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  W=window.innerWidth; H=window.innerHeight;
+  canvas.width=W*DPR; canvas.height=H*DPR;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
+}
+window.addEventListener('resize',resize); resize();
+
+const categoryOf=m=>{const a=m[0]*m[1];for(const k in CAT){if(a>=CAT[k][0]&&a<CAT[k][1])return k;}return"XL";};
+
+/* ---- synthetic plan: supersampled bitmap (anti-shimmer) ---------------- */
+function makeSyntheticPlan(meters,seed){
+  const longM=Math.max(meters[0],meters[1]);
+  const dens=Math.min(70, Math.max(14, 600/longM));
+  const w=Math.round(meters[0]*dens), h=Math.round(meters[1]*dens);
+  const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+  const g=cv.getContext('2d');
+  let s=(seed*2654435761)>>>0; const rnd=()=>(s=(s*1664525+1013904223)>>>0)/4294967296;
+  const lw=Math.max(1.6, Math.min(w,h)*0.006);
+  g.strokeStyle='#fff'; g.lineWidth=lw; g.lineJoin='miter';
+  const pad=Math.min(w,h)*0.04;
+  g.globalAlpha=.9;
+  g.strokeRect(pad,pad,w-2*pad,h-2*pad);
+  g.strokeRect(pad+lw*2.2,pad+lw*2.2,w-2*pad-lw*4.4,h-2*pad-lw*4.4);
+  (function split(x,y,bw,bh,d){
+    if(d<=0||bw<46||bh<46){ if(rnd()<0.35){g.globalAlpha=.5;g.strokeRect(x+6,y+6,bw-12,bh-12);} return; }
+    const horiz=bw<bh?true:(bw>bh?false:rnd()<0.5), t=0.32+rnd()*0.36;
+    g.globalAlpha=.85; g.beginPath();
+    if(horiz){const cy=y+bh*t; g.moveTo(x,cy); g.lineTo(x+bw,cy); g.stroke();
+      split(x,y,bw,bh*t,d-1); split(x,y+bh*t,bw,bh*(1-t),d-1);}
+    else{const cx=x+bw*t; g.moveTo(cx,y); g.lineTo(cx,y+bh); g.stroke();
+      split(x,y,bw*t,bh,d-1); split(x+bw*t,y,bw*(1-t),bh,d-1);}
+  })(pad+3,pad+3,w-2*pad-6,h-2*pad-6,3+Math.floor(rnd()*3));
+  if(rnd()<0.5){g.globalAlpha=.6;const r=Math.min(w,h)*(0.08+rnd()*0.12);
+    const cx=pad+r+rnd()*(w-2*pad-2*r),cy=pad+r+rnd()*(h-2*pad-2*r);
+    g.beginPath();g.arc(cx,cy,r,0,Math.PI*2);g.stroke();
+    g.beginPath();g.arc(cx,cy,r*0.45,0,Math.PI*2);g.stroke();}
+  g.globalAlpha=.4; const stp=Math.max(28,Math.min(w,h)/8);
+  for(let gx=pad+stp;gx<w-pad;gx+=stp)for(let gy=pad+stp;gy<h-pad;gy+=stp){g.fillStyle='#fff';g.fillRect(gx-1,gy-1,2,2);}
+  return cv;
+}
+
+/* ---- rasterize a loaded image (SVG or PNG) to a supersampled bitmap ---- */
+/* ---- rasterize a source (SVG/PNG/canvas) at a target resolution -------- */
+/* The on-screen size of a plan = metres × PX_PER_M × zoom. We keep each
+   plan's bitmap close to that size so it's never upscaled into blur, while
+   still being a fixed image per frame (so rotation doesn't shimmer).        */
+const MAX_RASTER = 3000;                 // memory ceiling per plan (px, long side)
+function rasterTarget(meters){
+  const dispLong = Math.max(meters[0],meters[1]) * PX_PER_M * state.zoom;
+  const t = dispLong < 700 ? dispLong*1.6 : dispLong*1.05;   // supersample small, ~1:1 large
+  return Math.round(Math.min(MAX_RASTER, Math.max(420, t)));
+}
+function rasterize(source, meters, longPx){
+  const ar=meters[0]/meters[1];
+  let w,h; if(ar>=1){ w=Math.round(longPx); h=Math.round(longPx/ar); }
+           else     { h=Math.round(longPx); w=Math.round(longPx*ar); }
+  const cv=document.createElement('canvas'); cv.width=Math.max(1,w); cv.height=Math.max(1,h);
+  const g=cv.getContext('2d');
+  g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high';
+  g.drawImage(source,0,0,cv.width,cv.height);
+  return cv;
+}
+function makeBitmap(sp){
+  if(!sp.source) return;
+  const t=rasterTarget(sp.meters);
+  try{ sp.bitmap=rasterize(sp.source,sp.meters,t); sp.bmLong=t; }
+  catch(e){ sp.bitmap=sp.source; sp.bmLong=0; }
+}
+function rescaleBitmaps(){               // called when zoom changes
+  for(const sp of sprites){
+    if(!sp.source || !sp.active) continue;
+    const t=rasterTarget(sp.meters);
+    if(!sp.bmLong || Math.abs(t-sp.bmLong)/sp.bmLong > 0.15) makeBitmap(sp);
+  }
+}
+
+/* ---- sprites ----------------------------------------------------------- */
+const sprites=[];
+function buildSprites(){
+  sprites.length=0;
+  PLANS.forEach((p,i)=>{
+    const sp={ data:p, meters:p.meters, cat:categoryOf(p.meters), bitmap:null, ready:false,
+      x:Math.random()*W, y:Math.random()*H, vx:(Math.random()-.5), vy:(Math.random()-.5),
+      ang:Math.random()*Math.PI*2, angVel:(Math.random()-.5)*0.0013, phase:Math.random()*1000,
+      depthPhase:Math.random(), depthRate:1/(16+Math.random()*22), d:0 };
+    if(p.src){const img=new Image(); img.crossOrigin='anonymous';
+      img.onload=()=>{ sp.source=img; makeBitmap(sp); sp.ready=true; };
+      img.onerror=()=>{ const cv=makeSyntheticPlan(p.meters,i+1); sp.bitmap=cv; sp.source=cv; sp.bmLong=Math.max(cv.width,cv.height); sp.ready=true; };
+      img.src=p.src;}
+    else{const cv=makeSyntheticPlan(p.meters,i+1);sp.bitmap=cv;sp.source=cv;sp.bmLong=Math.max(cv.width,cv.height);sp.ready=true;}
+    sprites.push(sp);
+  });
+}
+
+/* ---- population manager: how many plans swim at once ------------------- */
+/* sunny = 20, quiet = 10, frenzy = all. Counts are capped by how many plans
+   are in the enabled size classes. As an active plan drifts off-screen it is
+   recycled and a fresh one (from the rest of the set) swims in, looping the
+   whole collection. When the whole eligible set is already on, plans wrap.   */
+const MODE={frenzy:Infinity, sunny:20, quiet:10};
+const MODE_NAME={frenzy:'Feeding frenzy', sunny:'Sunny bath', quiet:'Quiet night'};
+let waiting=[];                       // eligible, currently inactive, in rotation order
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]];}return a;}
+function eligibleSprites(){ return sprites.filter(s=>state.show[s.cat]); }
+function randomPos(s){ s.x=Math.random()*W; s.y=Math.random()*H; s.vx=(Math.random()-.5); s.vy=(Math.random()-.5); s.d=randomDepth(); s.phase=Math.random()*1000; }
+function spawnEdge(s){                 // place just off a random edge, heading inward
+  const r=radius(s), side=(Math.random()*4)|0;
+  if(side===0){ s.x=-r-20; s.y=Math.random()*H; s.vx=1; s.vy=(Math.random()-.5); }
+  else if(side===1){ s.x=W+r+20; s.y=Math.random()*H; s.vx=-1; s.vy=(Math.random()-.5); }
+  else if(side===2){ s.y=-r-20; s.x=Math.random()*W; s.vy=1; s.vx=(Math.random()-.5); }
+  else { s.y=H+r+20; s.x=Math.random()*W; s.vy=-1; s.vx=(Math.random()-.5); }
+  s.d=randomDepth(); s.phase=Math.random()*1000;
+}
+function activate(s, atEdge){ s.active=true; s.leaving=false; makeBitmap(s); atEdge?spawnEdge(s):randomPos(s); }
+function rebuildPopulation(initial){
+  const elig=eligibleSprites(), eligSet=new Set(elig);
+  for(const s of sprites){ if(!eligSet.has(s)){ s.active=false; s.leaving=false; } }
+  const activeN=Math.min(MODE[state.mode], elig.length);
+  let committed=elig.filter(s=>s.active && !s.leaving);
+  if(committed.length>activeN){                       // too many → drain extras gracefully
+    shuffle(committed).slice(activeN).forEach(s=>s.leaving=true);
+  }else if(committed.length<activeN){                  // too few → bring more in
+    for(const s of elig){ if(committed.length>=activeN)break; if(s.active&&s.leaving){ s.leaving=false; committed.push(s);} }
+    const pool=shuffle(elig.filter(s=>!s.active));
+    while(committed.length<activeN && pool.length){ const s=pool.shift(); activate(s, !initial); committed.push(s); }
+  }
+  waiting=shuffle(elig.filter(s=>!s.active));
+}
+function recycle(s){                   // active plan exited → swap in a fresh one
+  s.active=false; waiting.push(s);
+  while(waiting.length){ const n=waiting.shift(); if(state.show[n.cat] && !n.active){ activate(n,true); break; } }
+}
+
+/* ---- load buildings from plans.csv (fallback: demo plans) -------------- */
+function parseCSV(text){
+  const rows=[]; let i=0,f='',row=[],q=false;
+  while(i<text.length){ const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){f+='"';i+=2;continue;} q=false;i++;continue;} f+=c;i++;continue; }
+    if(c==='"'){q=true;i++;continue;}
+    if(c===','){row.push(f);f='';i++;continue;}
+    if(c==='\r'){i++;continue;}
+    if(c==='\n'){row.push(f);rows.push(row);row=[];f='';i++;continue;}
+    f+=c;i++;
+  }
+  if(f.length||row.length){row.push(f);rows.push(row);}
+  return rows;
+}
+function plansFromCSV(text){
+  text=text.replace(/^\uFEFF/,'');                 // strip UTF-8 BOM that Excel/Sheets exports add
+  const rows=parseCSV(text).filter(r=>r.some(c=>c.trim()!==''));
+  if(rows.length<2) return null;
+  const head=rows[0].map(h=>h.trim().toLowerCase()), idx=n=>head.indexOf(n);
+  const out=[];
+  for(let r=1;r<rows.length;r++){
+    const row=rows[r], g=n=>{const k=idx(n);return k>=0?(row[k]||'').trim():'';};
+    const name=g('name'), file=g('file'), w=parseFloat(g('width_m')), h=parseFloat(g('height_m'));
+    if(!name||!file||!(w>0)||!(h>0)) continue;
+    const yr=g('year'), area=parseFloat(g('area_m2'));
+    const obj={ name, src:'plans/'+file, meters:[w,h],
+      function:g('function')||'—', architect:g('architect')||'—',
+      year:yr?(parseInt(yr,10)||yr):'—', url:g('url')||'#' };
+    if(area>0) obj.area=area;
+    out.push(obj);
+  }
+  return out.length?out:null;
+}
+function startWithData(){ buildSprites(); rebuildPopulation(true); rescaleBitmaps(); }
+fetch('plans.csv',{cache:'no-store'})
+  .then(r=>{ if(!r.ok) throw 0; return r.text(); })
+  .then(t=>{ const p=plansFromCSV(t); if(p&&p.length) PLANS=p; })
+  .catch(()=>{ /* no plans.csv (e.g. opened locally) — keep demo plans */ })
+  .finally(startWithData);
+
+/* ---- state / controls -------------------------------------------------- */
+const state={zoom:1,speed:1,paused:false,show:{S:true,M:true,L:true,XL:false},focus:null,drag:null,grid:true,mode:'sunny',sound:true};
+let hovered=null;
+const panel=document.getElementById('panel');
+
+/* ---- synthesized UI sounds (Web Audio, no files needed) ---------------- */
+let actx=null;
+function audio(){
+  if(!state.sound) return null;
+  if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } }
+  if(actx.state==='suspended') actx.resume();
+  return actx;
+}
+function blip(freq,dur,type,gain){
+  const ac=audio(); if(!ac) return;
+  const t=ac.currentTime, o=ac.createOscillator(), g=ac.createGain();
+  o.type=type||'sine'; o.frequency.value=freq;
+  g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(gain,t+0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(t); o.stop(t+dur+0.02);
+}
+const sfxTick   =()=>blip(660,0.028,'triangle',0.035);   // control tweak
+const sfxSelect =()=>{ blip(523,0.10,'sine',0.06); setTimeout(()=>blip(784,0.12,'sine',0.05),55); }; // focus open
+const sfxClose  =()=>blip(392,0.09,'sine',0.04);         // focus close
+
+// every button press and slider notch in the panel makes a soft tick
+panel.addEventListener('pointerdown',e=>{ if(e.target.closest('button')) sfxTick(); });
+panel.addEventListener('input',e=>{ if(e.target.type==='range') sfxTick(); });
+
+document.getElementById('collapse').onclick=e=>{
+  panel.classList.toggle('collapsed');
+  e.target.textContent=panel.classList.contains('collapsed')?'+':'–';
+};
+const sizesEl=document.getElementById('sizes');
+sizesEl.addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  state.show[b.dataset.cat]=!state.show[b.dataset.cat];
+  b.setAttribute('aria-pressed',state.show[b.dataset.cat]);
+  syncGrid(); rebuildPopulation(false); rescaleBitmaps();
+});
+
+const modesEl=document.getElementById('modes'), modev=document.getElementById('modev');
+function setMode(m){
+  state.mode=m; modev.textContent=MODE_NAME[m];
+  [...modesEl.children].forEach(b=>b.setAttribute('aria-pressed', b.dataset.mode===m));
+  if(m==='frenzy'){                       // override: turn every size class on
+    for(const k of ['S','M','L','XL']){ state.show[k]=true; const b=sizesEl.querySelector('[data-cat="'+k+'"]'); if(b)b.setAttribute('aria-pressed','true'); }
+    syncGrid();
+  }
+  rebuildPopulation(false); rescaleBitmaps();
+}
+modesEl.addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setMode(b.dataset.mode); });
+const SPEEDS=[
+  {n:"Sleepy turtle",     v:0.3},
+  {n:"Drifting jellyfish",v:0.6},
+  {n:"Cruising manatee",  v:1.0},
+  {n:"Darting dolphin",   v:1.6},
+  {n:"Turbo sailfish",    v:2.4},
+];
+const speedEl=document.getElementById('speed'),speedv=document.getElementById('speedv');
+function applySpeed(i){ state.speed=SPEEDS[i].v; speedv.textContent=SPEEDS[i].n; }
+speedEl.oninput=()=>applySpeed(+speedEl.value);
+applySpeed(+speedEl.value);
+document.getElementById('pause').onclick=e=>{state.paused=!state.paused;e.target.textContent=state.paused?'Play':'Pause';};
+document.getElementById('reseed').onclick=()=>{
+  sprites.forEach(s=>{ if(s.active) randomPos(s); });
+  waiting=shuffle(eligibleSprites().filter(s=>!s.active));
+};
+
+/* ---- scale grid: cell size keyed to the largest enabled class ---------- */
+const GRID_M={S:1,M:3,L:5,XL:10};
+function gridMeters(){ let m=10; for(const k of ['S','M','L','XL']) if(state.show[k]) m=GRID_M[k]; return m; }
+const gridBtn=document.getElementById('gridtoggle'), gridv=document.getElementById('gridv');
+function syncGrid(){ const m=gridMeters(); gridv.textContent=state.grid?(m+'×'+m+' m'):'off'; gridBtn.setAttribute('aria-pressed',state.grid); }
+gridBtn.onclick=()=>{ state.grid=!state.grid; syncGrid(); };
+syncGrid();
+
+const soundBtn=document.getElementById('soundtoggle'), soundv=document.getElementById('soundv');
+soundBtn.onclick=()=>{ state.sound=!state.sound; soundv.textContent=state.sound?'on':'off';
+  soundBtn.setAttribute('aria-pressed',state.sound); if(state.sound) sfxTick(); };
+
+/* ---- scale bar: a round reference distance at the current scale -------- */
+const sbBar=document.getElementById('sb-bar'), sbLabel=document.getElementById('sb-label');
+function updateScaleBar(){
+  const ppm=PX_PER_M*state.zoom, target=110;             // aim ~110px wide
+  let m=target/ppm;
+  const pow=Math.pow(10,Math.floor(Math.log10(m))), f=m/pow;
+  m=(f>=5?5:f>=2?2:1)*pow;                                // snap to 1/2/5 ×10ⁿ
+  sbBar.style.width=(m*ppm).toFixed(0)+'px';
+  sbLabel.textContent=m.toLocaleString()+' m';
+}
+updateScaleBar();
+
+/* ---- drawing-scale presets (1:100 … 1:1000) --------------------------- */
+/* CSS reference: 96px = 1 inch = 25.4mm, so this is "to scale on a standard
+   display" — exact ruler accuracy depends on the specific monitor.          */
+const PX_PER_MM = 96/25.4;
+const MASTER=[5000,2000,1000,500,200];     // standard ratios, coarse → fine
+const scaleEl=document.getElementById('scale'), scalev=document.getElementById('scalev');
+let STOPS=[];                               // current slider stops: ['fit', ...ratios]
+function fittingRatios(){                    // ratios where a ~50m building doesn't badly overflow
+  const ref=50, allow=1.5, base=PX_PER_MM*1000;
+  const f=MASTER.filter(S=> (ref*base/S) <= allow*W);
+  return f.length?f:[MASTER[0]];             // always keep at least the coarsest
+}
+function fitZoom(){ return 0.4*Math.min(W,H)/(80*PX_PER_M); } // a typical building ~40% of the short side
+function applyStop(i){
+  const stop=STOPS[i];
+  if(stop==='fit'){ state.zoom=fitZoom(); scalev.textContent='Fit'; }
+  else { state.zoom=(PX_PER_MM*1000/stop)/PX_PER_M; scalev.textContent='1:'+stop; }
+  updateScaleBar(); rescaleBitmaps();
+}
+function rebuildScale(){                      // recompute stops for the current window size
+  const prev=STOPS[+scaleEl.value];           // remember current label (undefined on first run)
+  STOPS=['fit'].concat(fittingRatios());
+  scaleEl.min=0; scaleEl.max=STOPS.length-1;
+  let idx=STOPS.indexOf(prev);
+  if(idx<0) idx = (prev===undefined) ? 0 : STOPS.length-1; // gone-too-fine → finest available
+  scaleEl.value=idx;
+  applyStop(idx);
+}
+scaleEl.oninput=()=>applyStop(+scaleEl.value);
+rebuildScale();                                // initial (defaults to Fit)
+window.addEventListener('resize', rebuildScale);
+
+/* ---- call out (search) ------------------------------------------------- */
+const findInput=document.getElementById('find'), findBtn=document.getElementById('findbtn');
+function callOut(){
+  const q=findInput.value.trim().toLowerCase();
+  if(!q){ state.focus=null; return; }
+  const hit=sprites.find(s=>s.data.name.toLowerCase().includes(q));
+  if(hit){
+    if(!state.show[hit.cat]){ state.show[hit.cat]=true;
+      const b=sizesEl.querySelector('[data-cat="'+hit.cat+'"]'); if(b)b.setAttribute('aria-pressed','true'); syncGrid(); }
+    if(!hit.active) activate(hit,false);   // bring it into the tank if it was resting
+    state.focus=hit;
+  }else{ findInput.classList.remove('miss'); void findInput.offsetWidth; findInput.classList.add('miss'); }
+}
+findBtn.onclick=callOut;
+findInput.addEventListener('keydown',e=>{ if(e.key==='Enter')callOut(); });
+const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---- helpers ----------------------------------------------------------- */
+const dispSize=s=>{const sc=PX_PER_M*state.zoom;return[s.meters[0]*sc,s.meters[1]*sc];};
+const radius=s=>{const[w,h]=dispSize(s);return Math.max(w,h)*0.40;};
+const triangle=p=>{p-=Math.floor(p);return p<0.5?p*2:2-2*p;};
+const DEPTHS=[0, 2/3, 1];              // back · middle · front  → 25% / 75% / 100% opacity
+const randomDepth=()=>DEPTHS[(Math.random()*DEPTHS.length)|0];
+const opacityFor=d=>0.25+0.75*d;
+const parallaxFor=d=>0.4+0.6*d;
+const held=s=>(s===state.focus||s===state.drag);   // physics-skipped (NOT hover)
+const fmtArea=s=>{const a=s.data.area!=null?s.data.area:Math.round(s.meters[0]*s.meters[1]);return a.toLocaleString()+' m²';};
+
+function hitTest(px,py){
+  let best=null,bestD=-1;
+  for(const s of sprites){
+    if(!s.active||!s.ready)continue;
+    const[w,h]=dispSize(s);
+    const dx=px-s.x, dy=py-s.y, c=Math.cos(-s.ang),sn=Math.sin(-s.ang);
+    const lx=dx*c-dy*sn, ly=dx*sn+dy*c;
+    const pad=Math.min(w,h)*0.12+6;
+    if(Math.abs(lx)<=w/2+pad && Math.abs(ly)<=h/2+pad){ if(s.d>bestD){bestD=s.d;best=s;} }
+  }
+  return best;
+}
+
+/* ---- hover card (follows cursor, plan keeps swimming) ------------------ */
+const card=document.getElementById('card');
+let cardSprite=null, mx=-1,my=-1;
+function buildCard(s){
+  const p=s.data;
+  card.innerHTML='<h3>'+p.name+'</h3><dl>'+
+    '<dt>Function</dt><dd>'+(p.function||'—')+'</dd>'+
+    '<dt>Floor area</dt><dd>'+fmtArea(s)+'</dd>'+
+    '<dt>Architect</dt><dd>'+(p.architect||'—')+'</dd>'+
+    '<dt>Year</dt><dd>'+(p.year||'—')+'</dd></dl>'+
+    '<div class="more">Double-click to focus</div>';
+}
+function placeCard(px,py){
+  const cw=card.offsetWidth||240, ch=card.offsetHeight||160;
+  let x=px+18,y=py+18;
+  if(x+cw>W-12)x=px-cw-18; if(y+ch>H-12)y=py-ch-18;
+  card.style.left=Math.max(12,x)+'px'; card.style.top=Math.max(12,y)+'px';
+}
+function updateCard(){
+  const target = hovered || state.focus;
+  if(target && !sub.classList.contains('on')){
+    if(target!==cardSprite){ buildCard(target); cardSprite=target; }
+    if(target===hovered && mx>=0) placeCard(mx,my); else placeCard(target.x,target.y);
+    card.classList.add('on');
+  }else{ card.classList.remove('on'); cardSprite=null; }
+}
+
+/* ---- focus subpage (original orientation) ------------------------------ */
+const sub=document.getElementById('sub');
+function openSub(s){
+  state.focus=null; hovered=null;
+  document.getElementById('sub-name').textContent=s.data.name;
+  const p=s.data;
+  document.getElementById('sub-dl').innerHTML=
+    '<dt>Function</dt><dd>'+(p.function||'—')+'</dd>'+
+    '<dt>Floor area</dt><dd>'+fmtArea(s)+'</dd>'+
+    '<dt>Architect</dt><dd>'+(p.architect||'—')+'</dd>'+
+    '<dt>Year</dt><dd>'+(p.year||'—')+'</dd>';
+  const link=document.getElementById('sub-link');
+  if(p.url&&p.url!=='#'){link.href=p.url;link.style.display='inline-block';} else link.style.display='none';
+  // render the bitmap upright (ang = 0 → as the file was uploaded)
+  const cvs=document.getElementById('subcanvas');
+  const ar=s.meters[0]/s.meters[1], maxW=Math.min(W*0.6,760), maxH=H*0.74;
+  let dw=maxW, dh=dw/ar; if(dh>maxH){dh=maxH; dw=dh*ar;}
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  cvs.width=Math.round(dw*dpr); cvs.height=Math.round(dh*dpr);
+  cvs.style.width=dw+'px'; cvs.style.height=dh+'px';
+  const g=cvs.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0);
+  g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high';
+  g.clearRect(0,0,dw,dh); g.drawImage(s.source||s.bitmap,0,0,dw,dh);
+  sub.classList.add('on'); sub.setAttribute('aria-hidden','false'); sfxSelect();
+}
+function closeSub(){ sub.classList.remove('on'); sub.setAttribute('aria-hidden','true'); sfxClose(); }
+document.getElementById('sub-close').onclick=closeSub;
+sub.addEventListener('click',e=>{ if(e.target===sub) closeSub(); });
+
+/* ---- pointer: hover · drag · double-click ------------------------------ */
+let dragDX=0,dragDY=0,lastX=0,lastY=0,lastT=0,dvx=0,dvy=0;
+canvas.addEventListener('pointerdown',e=>{
+  mx=e.clientX; my=e.clientY;
+  const hit=hitTest(mx,my);
+  if(hit){
+    state.drag=hit; state.focus=null;
+    dragDX=mx-hit.x; dragDY=my-hit.y;
+    lastX=mx; lastY=my; lastT=performance.now(); dvx=0; dvy=0;
+    try{canvas.setPointerCapture(e.pointerId);}catch(_){}
+    canvas.style.cursor='grabbing';
+  }
+});
+canvas.addEventListener('pointermove',e=>{
+  mx=e.clientX; my=e.clientY;
+  if(state.drag){
+    state.drag.x=mx-dragDX; state.drag.y=my-dragDY;
+    const now=performance.now(), dt=Math.max(8,now-lastT)/1000;
+    dvx=(mx-lastX)/dt; dvy=(my-lastY)/dt; lastX=mx; lastY=my; lastT=now;
+  }else{
+    hovered=hitTest(mx,my);
+    canvas.style.cursor=hovered?'grab':'default';
+  }
+});
+function endDrag(){
+  if(!state.drag) return;
+  const s=state.drag, sp=Math.hypot(dvx,dvy);
+  if(sp>30){ s.vx=dvx; s.vy=dvy; }            // throw direction (speed re-clamped in step)
+  else { s.vx=(Math.random()-.5); s.vy=(Math.random()-.5); }
+  state.drag=null; canvas.style.cursor=hovered?'grab':'default';
+}
+canvas.addEventListener('pointerup',e=>{
+  if(state.drag){ endDrag(); }
+  else if(!hitTest(e.clientX,e.clientY)){ state.focus=null; findInput.value=''; }
+});
+canvas.addEventListener('pointercancel',endDrag);
+canvas.addEventListener('pointerleave',()=>{ if(!state.drag){hovered=null;mx=-1;my=-1;} });
+canvas.addEventListener('dblclick',e=>{ const hit=hitTest(e.clientX,e.clientY); if(hit) openSub(hit); });
+window.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){ if(sub.classList.contains('on'))closeSub(); state.focus=null; findInput.blur(); }
+});
+
+/* ---- simulation -------------------------------------------------------- */
+function step(dt){
+  const base=14*state.speed;
+  for(const s of sprites){
+    if(!s.active)continue;
+
+    if(s===state.drag){ s.d=1; continue; }                 // held by cursor
+    if(s===state.focus){                                   // summoned: glide centre
+      s.x+=(W/2-s.x)*Math.min(1,2.2*dt);
+      s.y+=(H/2-s.y)*Math.min(1,2.2*dt);
+      s.d=1; continue;
+    }
+
+    s.phase+=dt;
+    const wob=Math.sin(s.phase*0.6+s.x*0.01)*0.4+(Math.random()-.5)*0.5;
+    const spd=Math.hypot(s.vx,s.vy)||1, nx=-s.vy/spd, ny=s.vx/spd;
+    s.vx+=nx*wob*dt; s.vy+=ny*wob*dt;
+
+    const r=radius(s);
+    for(const o of sprites){
+      if(o===s||held(o)||!o.active||Math.abs(o.d-s.d)>0.3)continue;
+      const dx=s.x-o.x,dy=s.y-o.y,dd=Math.hypot(dx,dy),want=(r+radius(o))*1.35;
+      if(dd>0&&dd<want){const f=(want-dd)/want*9*dt; s.vx+=(dx/dd)*f; s.vy+=(dy/dd)*f;}
+    }
+
+    const v=Math.hypot(s.vx,s.vy), target=base*parallaxFor(s.d);
+    if(v>0){const k=target/v; s.vx*=k; s.vy*=k;}
+    s.x+=s.vx*dt; s.y+=s.vy*dt;
+    s.ang+=s.angVel*60*dt*state.speed;
+
+    const m=r+40, off=(s.x<-m||s.x>W+m||s.y<-m||s.y>H+m);
+    if(off){
+      if(s.leaving){ s.active=false; s.leaving=false; }     // draining → let it go
+      else if(waiting.length){ recycle(s); }                // swap for a fresh plan
+      else {                                                // nobody waiting → wrap around
+        if(s.x<-m)s.x=W+m; else if(s.x>W+m)s.x=-m;
+        if(s.y<-m)s.y=H+m; else if(s.y>H+m)s.y=-m;
+      }
+    }
+  }
+
+  for(let i=0;i<sprites.length;i++){
+    const a=sprites[i]; if(!a.active||held(a))continue;
+    for(let j=i+1;j<sprites.length;j++){
+      const b=sprites[j];
+      if(!b.active||held(b)||Math.abs(a.d-b.d)>0.3)continue;
+      const dx=b.x-a.x,dy=b.y-a.y,dd=Math.hypot(dx,dy)||0.0001,min=radius(a)+radius(b);
+      if(dd<min){const ux=dx/dd,uy=dy/dd,push=(min-dd)*0.25,kick=1.5*state.speed;
+        a.x-=ux*push;a.y-=uy*push;b.x+=ux*push;b.y+=uy*push;
+        a.vx-=ux*kick;a.vy-=uy*kick;b.vx+=ux*kick;b.vy+=uy*kick;}
+    }
+  }
+}
+
+/* ---- scale grid render (back-most, 10% of front-plan opacity) ---------- */
+function drawGrid(){
+  const cell=gridMeters()*PX_PER_M*state.zoom;
+  if(cell<2)return;                       // too dense to read — zoom in to see it
+  ctx.save();
+  ctx.lineWidth=1; ctx.strokeStyle='rgba(255,255,255,0.10)';
+  ctx.beginPath();
+  for(let x=cell;x<W;x+=cell){ ctx.moveTo(x,0); ctx.lineTo(x,H); }
+  for(let y=cell;y<H;y+=cell){ ctx.moveTo(0,y); ctx.lineTo(W,y); }
+  ctx.stroke();
+  ctx.restore();
+}
+
+/* ---- render ------------------------------------------------------------ */
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
+  if(state.grid) drawGrid();
+  const vis=sprites.filter(s=>s.active&&s.ready).sort((a,b)=>a.d-b.d);
+  for(const s of vis){
+    const[w,h]=dispSize(s);
+    ctx.save();
+    ctx.translate(s.x,s.y); ctx.rotate(s.ang);
+    ctx.globalAlpha=(held(s)||s===hovered)?1:opacityFor(s.d);
+    ctx.drawImage(s.bitmap,-w/2,-h/2,w,h);
+    ctx.restore();
+  }
+  document.getElementById('count').textContent=vis.length+' / '+sprites.length;
+}
+
+/* ---- loop -------------------------------------------------------------- */
+let last=performance.now();
+function frame(now){
+  let dt=(now-last)/1000; last=now; if(dt>0.05)dt=0.05;
+  if(!state.drag && mx>=0 && !sub.classList.contains('on')) hovered=hitTest(mx,my); // live hover
+  if(!state.paused) step(dt*(reduceMotion?0.25:1));
+  updateCard(); draw();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
