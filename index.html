@@ -31,7 +31,8 @@
   .masthead{position:fixed;top:max(18px,env(safe-area-inset-top));left:22px;z-index:10;
     pointer-events:none;mix-blend-mode:difference}
   .wordmark{font-family:var(--grotesk);font-weight:800;letter-spacing:-.035em;
-    font-size:clamp(21.6px,3.6vw,45px);line-height:.9}
+    font-size:clamp(21.6px,3.6vw,45px);line-height:.9;pointer-events:auto;cursor:pointer}
+  .wordmark:hover{opacity:.82}
   .submark{font-family:var(--mono);font-size:11px;letter-spacing:.34em;
     margin-top:8px;opacity:.75;text-transform:uppercase}
 
@@ -46,14 +47,20 @@
     width:20px;height:20px;line-height:1;cursor:pointer}
   .phead button:hover{background:rgba(255,255,255,.08)}
   .panel.collapsed .pbody{display:none}
-  .row{padding:7px 11px;border-bottom:1px solid var(--hair-soft)}
+  .row{padding:5px 11px;border-bottom:1px solid var(--hair-soft)}
   .row:last-child{border-bottom:0}
   .lbl{display:flex;justify-content:space-between;align-items:center;
-    opacity:.7;margin-bottom:6px;font-size:10px;letter-spacing:.2em}
+    opacity:.7;margin-bottom:4px;font-size:10px;letter-spacing:.2em}
   .lbl b{font-weight:400;opacity:1;color:var(--ink)}
   .lbl #speedv{text-transform:none;letter-spacing:.02em}
   .seg{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
   .seg2{grid-template-columns:1fr 1fr}
+  .seg3{grid-template-columns:repeat(3,1fr)}
+  .sel{width:100%;font:inherit;text-transform:uppercase;letter-spacing:.12em;color:var(--ink);
+    background:rgba(255,255,255,.04);border:1px solid var(--hair);padding:6px 8px;cursor:pointer;
+    appearance:none;-webkit-appearance:none;outline:none}
+  .sel:focus{border-color:#fff}
+  .sel option{background:#0a0d12;color:#fff}
   .modes{display:flex;flex-direction:column;gap:5px}
   .modes button{display:flex;justify-content:space-between;align-items:center;font:inherit;
     text-transform:uppercase;letter-spacing:.1em;padding:7px 9px;background:transparent;
@@ -81,6 +88,17 @@
   .find button{width:100%;font:inherit;text-transform:uppercase;letter-spacing:.12em;padding:6px 0;
     background:transparent;color:#fff;border:1px solid var(--hair);cursor:pointer}
   .find button:hover{background:rgba(255,255,255,.08)}
+  .find-ac{position:relative;margin-bottom:5px}
+  .find-ac input{margin-bottom:0}
+  .suggest{position:absolute;left:0;right:0;top:calc(100% + 2px);z-index:30;display:none;
+    background:#0a0d12;border:1px solid var(--hair);max-height:172px;overflow-y:auto}
+  .suggest.on{display:block}
+  .suggest button{display:block;width:100%;text-align:left;padding:6px 9px;background:transparent;
+    border:0;border-bottom:1px solid var(--hair-soft);color:var(--ink);font:inherit;
+    text-transform:none;letter-spacing:.01em;font-size:11px;cursor:pointer}
+  .suggest button:last-child{border-bottom:0}
+  .suggest button:hover{background:rgba(255,255,255,.1)}
+  .suggest .a{opacity:.5;font-size:9px;margin-left:7px}
   .btns{display:grid;grid-template-columns:1fr 1fr;gap:5px}
   .btns button{font:inherit;text-transform:uppercase;letter-spacing:.12em;padding:6px 0;
     background:transparent;color:var(--ink);border:1px solid var(--hair);cursor:pointer}
@@ -90,6 +108,19 @@
   .toggle[aria-pressed="true"]{background:var(--ink);color:#000;border-color:var(--ink)}
   .toggle:hover{background:rgba(255,255,255,.08)}
   .toggle[aria-pressed="true"]:hover{background:#eee}
+
+  /* ---- hello note ---- */
+  .hello{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.72);backdrop-filter:blur(4px);padding:24px}
+  .hello.on{display:flex}
+  .hello-card{position:relative;max-width:430px;background:#0a0d12;border:1px solid var(--hair);
+    padding:36px 32px 30px;font-family:var(--mono);color:var(--ink)}
+  .hello-x{position:absolute;top:10px;right:10px;width:26px;height:26px;line-height:1;
+    background:transparent;border:1px solid var(--hair);color:var(--ink);cursor:pointer}
+  .hello-x:hover{background:rgba(255,255,255,.08)}
+  .hello-h{font-family:var(--grotesk);font-weight:800;font-size:27px;letter-spacing:-.02em;margin-bottom:16px}
+  .hello p{font-size:13px;line-height:1.72;letter-spacing:.015em;opacity:.86;margin:0 0 13px;text-transform:none}
+  .hello a{color:#fff;text-underline-offset:3px}
 
   /* ---- hover info card ---- */
   .card{position:fixed;z-index:20;min-width:218px;max-width:280px;
@@ -152,8 +183,18 @@
 <canvas id="c"></canvas>
 
 <div class="masthead">
-  <div class="wordmark">Architecture<br>Playground</div>
+  <div class="wordmark" id="hello-open" title="A note from the maker">Architecture<br>Playground</div>
   <div class="submark">Floorplan Aquarium</div>
+</div>
+
+<div id="hello" class="hello" aria-hidden="true">
+  <div class="hello-card">
+    <button class="hello-x" id="hello-close" aria-label="Close">✕</button>
+    <div class="hello-h">Hello</div>
+    <p>Welcome to my little Architecture Playground.</p>
+    <p>Here I redraw some of my favorite buildings — ones I've actually been to — and set them loose at true scale, drifting and crossing paths like creatures in a tank.</p>
+    <p>Thanks for swimming by. Say hello anytime:<br><a href="mailto:chhivexthai@gmail.com">chhivexthai@gmail.com</a></p>
+  </div>
 </div>
 
 <aside class="panel collapsed" id="panel">
@@ -161,15 +202,18 @@
   <div class="pbody" id="pbody">
     <div class="row find">
       <div class="lbl">Call out</div>
-      <input id="find" type="text" placeholder="Building name…" autocomplete="off" spellcheck="false">
+      <div class="find-ac">
+        <input id="find" type="text" placeholder="Building or architect…" autocomplete="off" spellcheck="false">
+        <div class="suggest" id="suggest"></div>
+      </div>
       <button id="findbtn">Call out</button>
     </div>
     <div class="row">
       <div class="lbl">Mode <b id="modev">Sunny bath</b></div>
-      <div class="modes" id="modes">
-        <button data-mode="frenzy">Feeding frenzy <span>all</span></button>
-        <button data-mode="sunny" aria-pressed="true">Sunny bath <span>20</span></button>
-        <button data-mode="quiet">Quiet night <span>10</span></button>
+      <div class="seg seg3" id="modes">
+        <button data-mode="frenzy">Frenzy<span class="n">all</span></button>
+        <button data-mode="sunny" aria-pressed="true">Sunny<span class="n">20</span></button>
+        <button data-mode="quiet">Quiet<span class="n">10</span></button>
       </div>
     </div>
     <div class="row">
@@ -190,12 +234,19 @@
       <input type="range" id="speed" min="0" max="4" step="1" value="1">
     </div>
     <div class="row">
-      <div class="lbl">Scale grid <b id="gridv">5×5 m</b></div>
-      <button id="gridtoggle" class="toggle" aria-pressed="true">Grid</button>
+      <div class="lbl">Grid <b id="gridv">5×5 m</b> · Sound <b id="soundv">on</b></div>
+      <div class="btns">
+        <button id="gridtoggle" class="toggle" aria-pressed="true">Grid</button>
+        <button id="soundtoggle" class="toggle" aria-pressed="true">Sound</button>
+      </div>
     </div>
     <div class="row">
-      <div class="lbl">Sound <b id="soundv">on</b></div>
-      <button id="soundtoggle" class="toggle" aria-pressed="true">Sound</button>
+      <div class="lbl">Ambience</div>
+      <select id="ambience" class="sel">
+        <option value="off">Off</option>
+        <option value="waves">Waves</option>
+        <option value="machine">Machine</option>
+      </select>
     </div>
     <div class="row">
       <div class="btns">
@@ -343,7 +394,7 @@ const sprites=[];
 function buildSprites(){
   sprites.length=0;
   PLANS.forEach((p,i)=>{
-    const sp={ data:p, meters:p.meters, cat:categoryOf(p.meters), weight:(p.weight!=null?p.weight:100), bitmap:null, ready:false,
+    const sp={ data:p, meters:p.meters, cat:categoryOf(p.meters), weight:(p.weight!=null?p.weight:100), speedJit:0.95+Math.random()*0.1, bitmap:null, ready:false,
       x:Math.random()*W, y:Math.random()*H, vx:(Math.random()-.5), vy:(Math.random()-.5),
       ang:Math.random()*Math.PI*2, angVel:(Math.random()-.5)*0.0013, phase:Math.random()*1000,
       depthPhase:Math.random(), depthRate:1/(16+Math.random()*22), d:0 };
@@ -386,24 +437,24 @@ function activate(s, atEdge){ s.active=true; s.leaving=false; makeBitmap(s); atE
 function rebuildPopulation(initial){
   const elig=eligibleSprites(), eligSet=new Set(elig);
   for(const s of sprites){ if(!eligSet.has(s)){ s.active=false; s.leaving=false; } }
-  const activeN=Math.min(MODE[state.mode], elig.length);
-  let committed=elig.filter(s=>s.active && !s.leaving);
-  if(committed.length>activeN){                       // too many → drain extras gracefully
-    shuffle(committed).slice(activeN).forEach(s=>s.leaving=true);
-  }else if(committed.length<activeN){                  // too few → bring more in
-    for(const s of elig){ if(committed.length>=activeN)break; if(s.active&&s.leaving){ s.leaving=false; committed.push(s);} }
-    const pool=elig.filter(s=>!s.active);
-    while(committed.length<activeN && pool.length){
-      const s=pickWeighted(pool); pool.splice(pool.indexOf(s),1);
-      activate(s, !initial); committed.push(s);
-    }
+  const cap=Math.min(MODE[state.mode], elig.length);
+  let chosen;
+  if(state.mode==='frenzy'){ chosen=elig.slice(); }                       // frenzy = everyone, ignore frequency
+  else{ chosen=elig.filter(s=>Math.random()<Math.min(1,s.weight/100));    // include each by its frequency %
+        if(chosen.length>cap) chosen=shuffle(chosen).slice(0,cap); }      // never exceed the mode cap
+  const chosenSet=new Set(chosen);
+  for(const s of elig){
+    if(chosenSet.has(s)){ if(!s.active) activate(s,!initial); s.leaving=false; }
+    else if(s.active) s.leaving=true;                                     // drain gracefully off-screen
   }
   waiting=shuffle(elig.filter(s=>!s.active));
 }
-function recycle(s){                   // active plan exited → swap in a fresh one (odds ∝ frequency)
+function recycle(s){                   // active plan exited → maybe swap in a fresh one (gated by frequency)
   s.active=false; waiting.push(s);
   const pool=waiting.filter(n=>state.show[n.cat] && !n.active && n.weight>0);
-  if(pool.length){ const n=pickWeighted(pool); waiting.splice(waiting.indexOf(n),1); activate(n,true); }
+  if(!pool.length) return;
+  const n=pickWeighted(pool);
+  if(Math.random()<Math.min(1,n.weight/100)){ waiting.splice(waiting.indexOf(n),1); activate(n,true); }
 }
 
 /* ---- load buildings from plans.csv (fallback: demo plans) -------------- */
@@ -454,13 +505,14 @@ let hovered=null;
 const panel=document.getElementById('panel');
 
 /* ---- synthesized UI sounds (Web Audio, no files needed) ---------------- */
-let actx=null;
-function audio(){
-  if(!state.sound) return null;
-  if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } }
+let actx=null, master=null;
+function audioCtx(){
+  if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; }
+    master=actx.createGain(); master.gain.value=0.75; master.connect(actx.destination); }  // default volume 75%
   if(actx.state==='suspended') actx.resume();
   return actx;
 }
+function audio(){ return state.sound ? audioCtx() : null; }   // click sounds gated by Sound toggle
 function blip(freq,dur,type,gain){
   const ac=audio(); if(!ac) return;
   const t=ac.currentTime, o=ac.createOscillator(), g=ac.createGain();
@@ -468,7 +520,7 @@ function blip(freq,dur,type,gain){
   g.gain.setValueAtTime(0,t);
   g.gain.linearRampToValueAtTime(gain,t+0.004);
   g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-  o.connect(g); g.connect(ac.destination);
+  o.connect(g); g.connect(master);
   o.start(t); o.stop(t+dur+0.02);
 }
 const sfxTick   =()=>blip(660,0.028,'triangle',0.035);   // control tweak
@@ -479,10 +531,64 @@ const sfxClose  =()=>blip(392,0.09,'sine',0.04);         // focus close
 panel.addEventListener('pointerdown',e=>{ if(e.target.closest('button')) sfxTick(); });
 panel.addEventListener('input',e=>{ if(e.target.type==='range') sfxTick(); });
 
-document.getElementById('collapse').onclick=e=>{
-  panel.classList.toggle('collapsed');
-  e.target.textContent=panel.classList.contains('collapsed')?'+':'–';
-};
+/* ---- ambient bed: synthesized Waves / Machine (independent of Sound) --- */
+let amb=null;
+function noiseBuf(ac,sec){ const n=Math.floor(ac.sampleRate*sec), b=ac.createBuffer(1,n,ac.sampleRate), d=b.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; return b; }
+function startAmbience(kind){
+  const ac=audioCtx(); if(!ac) return;
+  stopAmbience(true);
+  const out=ac.createGain(), t=ac.currentTime, parts=[]; out.gain.setValueAtTime(0,t); out.connect(master);
+  if(kind==='waves'){
+    const src=ac.createBufferSource(); src.buffer=noiseBuf(ac,3); src.loop=true;
+    const lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=520; lp.Q.value=0.6;
+    const swell=ac.createGain(); swell.gain.value=0.7;
+    src.connect(lp); lp.connect(swell); swell.connect(out);
+    const lfo=ac.createOscillator(); lfo.frequency.value=0.08; const lg=ac.createGain(); lg.gain.value=0.35; lfo.connect(lg); lg.connect(swell.gain);
+    const lfo2=ac.createOscillator(); lfo2.frequency.value=0.05; const l2=ac.createGain(); l2.gain.value=190; lfo2.connect(l2); l2.connect(lp.frequency);
+    const drone=ac.createOscillator(); drone.type='sine'; drone.frequency.value=72; const dg=ac.createGain(); dg.gain.value=0.18; drone.connect(dg); dg.connect(out);
+    [src,lfo,lfo2,drone].forEach(n=>n.start(t)); parts.push(src,lfo,lfo2,drone);
+    out.gain.linearRampToValueAtTime(0.16,t+1.4);
+  }else if(kind==='machine'){
+    const o1=ac.createOscillator(); o1.type='sawtooth'; o1.frequency.value=58;
+    const o2=ac.createOscillator(); o2.type='sawtooth'; o2.frequency.value=58.7;
+    const hf=ac.createBiquadFilter(); hf.type='lowpass'; hf.frequency.value=170; hf.Q.value=0.7;
+    const hg=ac.createGain(); hg.gain.value=0.7; o1.connect(hf); o2.connect(hf); hf.connect(hg); hg.connect(out);
+    const src=ac.createBufferSource(); src.buffer=noiseBuf(ac,3); src.loop=true;
+    const bp=ac.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1400; bp.Q.value=0.8;
+    const ag=ac.createGain(); ag.gain.value=0.22; src.connect(bp); bp.connect(ag); ag.connect(out);
+    const lfo=ac.createOscillator(); lfo.frequency.value=0.18; const lg=ac.createGain(); lg.gain.value=0.12; lfo.connect(lg); lg.connect(hg.gain);
+    [o1,o2,src,lfo].forEach(n=>n.start(t)); parts.push(o1,o2,src,lfo);
+    out.gain.linearRampToValueAtTime(0.14,t+1.2);
+  }else{ try{out.disconnect();}catch(_){} return; }
+  amb={out,parts};
+}
+function stopAmbience(quick){
+  if(!amb||!actx) return; const {out,parts}=amb; amb=null; const t=actx.currentTime;
+  try{ out.gain.cancelScheduledValues(t); out.gain.setValueAtTime(out.gain.value,t); out.gain.linearRampToValueAtTime(0,t+(quick?0.05:0.7)); }catch(_){}
+  setTimeout(()=>{ parts.forEach(n=>{try{n.stop();}catch(_){};try{n.disconnect();}catch(_){}}); try{out.disconnect();}catch(_){}; }, quick?90:760);
+}
+const ambienceEl=document.getElementById('ambience');
+ambienceEl.addEventListener('change',()=>{ const kind=ambienceEl.value; if(kind==='off') stopAmbience(); else startAmbience(kind); });
+
+/* ---- hello note (click the title) ---- */
+const hello=document.getElementById('hello');
+function openHello(){ hello.classList.add('on'); hello.setAttribute('aria-hidden','false'); sfxSelect(); }
+function closeHello(){ hello.classList.remove('on'); hello.setAttribute('aria-hidden','true'); sfxClose(); }
+document.getElementById('hello-open').addEventListener('click',openHello);
+document.getElementById('hello-close').onclick=closeHello;
+hello.addEventListener('click',e=>{ if(e.target===hello) closeHello(); });
+addEventListener('keydown',e=>{ if(e.key==='Escape' && hello.classList.contains('on')) closeHello(); });
+
+const collapseBtn=document.getElementById('collapse');
+function setCollapsed(v){
+  panel.classList.toggle('collapsed', v);
+  collapseBtn.textContent = v ? '+' : '–';
+}
+collapseBtn.onclick=()=>setCollapsed(!panel.classList.contains('collapsed'));
+// collapse when tapping/clicking anywhere outside the panel (desktop + mobile)
+document.addEventListener('pointerdown',e=>{
+  if(!panel.classList.contains('collapsed') && !panel.contains(e.target)) setCollapsed(true);
+});
 const sizesEl=document.getElementById('sizes');
 sizesEl.addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b)return;
@@ -515,8 +621,8 @@ speedEl.oninput=()=>applySpeed(+speedEl.value);
 speedEl.value=2; applySpeed(2);            // default: Cruising manatee
 document.getElementById('pause').onclick=e=>{state.paused=!state.paused;e.target.textContent=state.paused?'Play':'Pause';};
 document.getElementById('reseed').onclick=()=>{
-  sprites.forEach(s=>{ if(s.active) randomPos(s); });
-  waiting=shuffle(eligibleSprites().filter(s=>!s.active));
+  sprites.forEach(s=>{ s.active=false; s.leaving=false; });   // clear, then re-roll the cast by frequency
+  rebuildPopulation(true);
 };
 
 /* ---- scale grid: cell size keyed to the largest enabled class ---------- */
@@ -580,7 +686,9 @@ const findInput=document.getElementById('find'), findBtn=document.getElementById
 function callOut(){
   const q=findInput.value.trim().toLowerCase();
   if(!q){ state.focus=null; return; }
-  const hit=sprites.find(s=>s.data.name.toLowerCase().includes(q));
+  const hit = sprites.find(s=>s.data.name.toLowerCase()===q)
+           || sprites.find(s=>s.data.name.toLowerCase().includes(q))
+           || sprites.find(s=>(s.data.architect||'').toLowerCase().includes(q));
   if(hit){
     if(!state.show[hit.cat]){ state.show[hit.cat]=true;
       const b=sizesEl.querySelector('[data-cat="'+hit.cat+'"]'); if(b)b.setAttribute('aria-pressed','true'); syncGrid(); }
@@ -589,7 +697,26 @@ function callOut(){
   }else{ findInput.classList.remove('miss'); void findInput.offsetWidth; findInput.classList.add('miss'); }
 }
 findBtn.onclick=callOut;
-findInput.addEventListener('keydown',e=>{ if(e.key==='Enter')callOut(); });
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const sug=document.getElementById('suggest');
+function renderSuggest(){
+  const q=findInput.value.trim().toLowerCase();
+  if(!q){ sug.classList.remove('on'); sug.innerHTML=''; return; }
+  const seen=new Set(), rows=[];
+  for(const p of PLANS){ const nm=p.name||'', ar=(p.architect||'');
+    if((nm.toLowerCase().includes(q)||(ar&&ar!=='—'&&ar.toLowerCase().includes(q))) && !seen.has(nm.toLowerCase())){
+      seen.add(nm.toLowerCase()); rows.push({nm,ar}); if(rows.length>=8) break; } }
+  if(!rows.length){ sug.classList.remove('on'); sug.innerHTML=''; return; }
+  sug.innerHTML=rows.map(r=>'<button type="button" data-name="'+esc(r.nm)+'">'+esc(r.nm)+
+    (r.ar&&r.ar!=='—'?'<span class="a">'+esc(r.ar)+'</span>':'')+'</button>').join('');
+  sug.classList.add('on');
+}
+findInput.addEventListener('input',renderSuggest);
+findInput.addEventListener('focus',renderSuggest);
+findInput.addEventListener('blur',()=>setTimeout(()=>sug.classList.remove('on'),140));
+sug.addEventListener('mousedown',e=>{ const b=e.target.closest('button'); if(!b)return;
+  e.preventDefault(); findInput.value=b.dataset.name; sug.classList.remove('on'); callOut(); });
+findInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){ sug.classList.remove('on'); callOut(); } });
 const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ---- helpers ----------------------------------------------------------- */
@@ -598,11 +725,16 @@ const radius=s=>{const[w,h]=dispSize(s);return Math.max(w,h)*0.40;};
 const triangle=p=>{p-=Math.floor(p);return p<0.5?p*2:2-2*p;};
 const DEPTHS=[0, 2/3, 1];              // back · middle · front  → 25% / 75% / 100% opacity
 const randomDepth=()=>DEPTHS[(Math.random()*DEPTHS.length)|0];
-const isBig=s=>(s.cat==='L'||s.cat==='XL');
-function frontBig(except){ let n=0; for(const s of sprites) if(s.active&&s!==except&&s.d===1&&isBig(s)) n++; return n; }
-function assignDepth(s){                     // cap front (d=1) L/XL plans at 3 → extras sink to back/middle
+const SIZE_SPEED={S:1, M:0.9, L:0.8, XL:0.75};   // bigger plans drift slower (× the drift setting)
+function frontCounts(except){ let xl=0,l=0; for(const s of sprites) if(s.active&&s!==except&&s.d===1){ if(s.cat==='XL')xl++; else if(s.cat==='L')l++; } return {xl,l}; }
+function canFront(s,c){                            // front-depth caps: ≤1 XL, ≤3 L, ≤3 L+XL combined
+  if(s.cat==='XL') return c.xl<1 && (c.xl+c.l)<3;
+  if(s.cat==='L')  return c.l<3  && (c.xl+c.l)<3;
+  return true;                                     // S / M unrestricted at front
+}
+function assignDepth(s){
   let d=randomDepth();
-  if(d===1 && isBig(s) && frontBig(s)>=3) d=DEPTHS[(Math.random()*2)|0];
+  if(d===1 && !canFront(s, frontCounts(s))) d=DEPTHS[(Math.random()*2)|0];   // bump to back/middle
   s.d=d;
 }
 const opacityFor=d=>0.25+0.75*d;
@@ -765,14 +897,14 @@ function step(dt){
       if(dd>0&&dd<want){const f=(want-dd)/want*9*dt; s.vx+=(dx/dd)*f; s.vy+=(dy/dd)*f;}
     }
 
-    const v=Math.hypot(s.vx,s.vy), target=base*parallaxFor(s.d);
+    const v=Math.hypot(s.vx,s.vy), target=base*parallaxFor(s.d)*SIZE_SPEED[s.cat]*s.speedJit;
     if(v>0){const k=target/v; s.vx*=k; s.vy*=k;}
     s.x+=s.vx*dt; s.y+=s.vy*dt;
     s.ang+=s.angVel*60*dt*state.speed;
 
     const m=r+40, off=(s.x<-m||s.x>W+m||s.y<-m||s.y>H+m);
     if(off){
-      if(s.leaving){ s.active=false; s.leaving=false; }     // draining → let it go
+      if(s.leaving){ s.active=false; s.leaving=false; waiting.push(s); } // draining → bench it
       else if(waiting.length){ recycle(s); }                // swap for a fresh plan
       else {                                                // nobody waiting → wrap around
         if(s.x<-m)s.x=W+m; else if(s.x>W+m)s.x=-m;
