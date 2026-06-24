@@ -372,7 +372,7 @@ function pickWeighted(pool){           // choose one sprite, odds ∝ its weight
   for(const s of pool){ r-=(s.weight||0); if(r<=0) return s; }
   return pool[pool.length-1];
 }
-function eligibleSprites(){ return sprites.filter(s=>state.show[s.cat]); }
+function eligibleSprites(){ return sprites.filter(s=>state.show[s.cat] && s.weight>0); }
 function randomPos(s){ s.x=Math.random()*W; s.y=Math.random()*H; s.vx=(Math.random()-.5); s.vy=(Math.random()-.5); assignDepth(s); s.phase=Math.random()*1000; }
 function spawnEdge(s){                 // place just off a random edge, heading inward
   const r=radius(s), side=(Math.random()*4)|0;
@@ -402,7 +402,7 @@ function rebuildPopulation(initial){
 }
 function recycle(s){                   // active plan exited → swap in a fresh one (odds ∝ frequency)
   s.active=false; waiting.push(s);
-  const pool=waiting.filter(n=>state.show[n.cat] && !n.active);
+  const pool=waiting.filter(n=>state.show[n.cat] && !n.active && n.weight>0);
   if(pool.length){ const n=pickWeighted(pool); waiting.splice(waiting.indexOf(n),1); activate(n,true); }
 }
 
