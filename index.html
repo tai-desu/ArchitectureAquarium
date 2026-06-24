@@ -343,7 +343,7 @@ const sprites=[];
 function buildSprites(){
   sprites.length=0;
   PLANS.forEach((p,i)=>{
-    const sp={ data:p, meters:p.meters, cat:categoryOf(p.meters), bitmap:null, ready:false,
+    const sp={ data:p, meters:p.meters, cat:categoryOf(p.meters), weight:(p.weight!=null?p.weight:100), bitmap:null, ready:false,
       x:Math.random()*W, y:Math.random()*H, vx:(Math.random()-.5), vy:(Math.random()-.5),
       ang:Math.random()*Math.PI*2, angVel:(Math.random()-.5)*0.0013, phase:Math.random()*1000,
       depthPhase:Math.random(), depthRate:1/(16+Math.random()*22), d:0 };
@@ -365,6 +365,13 @@ const MODE={frenzy:Infinity, sunny:20, quiet:10};
 const MODE_NAME={frenzy:'Feeding frenzy', sunny:'Sunny bath', quiet:'Quiet night'};
 let waiting=[];                       // eligible, currently inactive, in rotation order
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]];}return a;}
+function pickWeighted(pool){           // choose one sprite, odds ∝ its weight (CSV frequency)
+  let tot=0; for(const s of pool) tot+=(s.weight||0);
+  if(tot<=0) return pool[(Math.random()*pool.length)|0];
+  let r=Math.random()*tot;
+  for(const s of pool){ r-=(s.weight||0); if(r<=0) return s; }
+  return pool[pool.length-1];
+}
 function eligibleSprites(){ return sprites.filter(s=>state.show[s.cat]); }
 function randomPos(s){ s.x=Math.random()*W; s.y=Math.random()*H; s.vx=(Math.random()-.5); s.vy=(Math.random()-.5); assignDepth(s); s.phase=Math.random()*1000; }
 function spawnEdge(s){                 // place just off a random edge, heading inward
@@ -385,14 +392,18 @@ function rebuildPopulation(initial){
     shuffle(committed).slice(activeN).forEach(s=>s.leaving=true);
   }else if(committed.length<activeN){                  // too few → bring more in
     for(const s of elig){ if(committed.length>=activeN)break; if(s.active&&s.leaving){ s.leaving=false; committed.push(s);} }
-    const pool=shuffle(elig.filter(s=>!s.active));
-    while(committed.length<activeN && pool.length){ const s=pool.shift(); activate(s, !initial); committed.push(s); }
+    const pool=elig.filter(s=>!s.active);
+    while(committed.length<activeN && pool.length){
+      const s=pickWeighted(pool); pool.splice(pool.indexOf(s),1);
+      activate(s, !initial); committed.push(s);
+    }
   }
   waiting=shuffle(elig.filter(s=>!s.active));
 }
-function recycle(s){                   // active plan exited → swap in a fresh one
+function recycle(s){                   // active plan exited → swap in a fresh one (odds ∝ frequency)
   s.active=false; waiting.push(s);
-  while(waiting.length){ const n=waiting.shift(); if(state.show[n.cat] && !n.active){ activate(n,true); break; } }
+  const pool=waiting.filter(n=>state.show[n.cat] && !n.active);
+  if(pool.length){ const n=pickWeighted(pool); waiting.splice(waiting.indexOf(n),1); activate(n,true); }
 }
 
 /* ---- load buildings from plans.csv (fallback: demo plans) -------------- */
@@ -420,9 +431,11 @@ function plansFromCSV(text){
     const name=g('name'), file=g('file'), w=parseFloat(g('width_m')), h=parseFloat(g('height_m'));
     if(!name||!file||!(w>0)||!(h>0)) continue;
     const yr=g('year'), area=parseFloat(g('area_m2'));
+    const fraw=g('frequency')||g('chance')||g('weight'), fval=parseFloat(String(fraw).replace('%',''));
     const obj={ name, src:'plans/'+file, meters:[w,h],
       function:g('function')||'—', architect:g('architect')||'—',
-      year:yr?(parseInt(yr,10)||yr):'—', url:g('url')||'#' };
+      year:yr?(parseInt(yr,10)||yr):'—', url:g('url')||'#',
+      weight:(fraw!==''&&isFinite(fval))?Math.max(0,fval):100 };
     if(area>0) obj.area=area;
     out.push(obj);
   }
